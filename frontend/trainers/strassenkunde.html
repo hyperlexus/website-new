@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Straßenkunde Feuerwehr</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { height: 100vh; width: 100%; z-index: 1; cursor: crosshair; }
+
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            text-align: center;
+            min-width: 320px;
+            pointer-events: auto;
+        }
+
+        h1 { margin: 0 0 5px 0; font-size: 1rem; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+
+        #town-select {
+            margin: 10px 0;
+            padding: 8px;
+            font-size: 1rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            width: 100%;
+        }
+
+        #target-street { font-size: 2rem; font-weight: 800; color: #111; display: block; margin: 10px 0; }
+
+        #feedback { font-weight: bold; margin-bottom: 15px; min-height: 1.2em; }
+        .correct { color: #2e7d32; }
+        .wrong { color: #c62828; }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        button:hover { background-color: #0056b3; }
+
+        .loading { color: #888; font-style: italic; }
+
+        /* feuerwehrhaus icon */
+        .fire-station-icon {
+            font-size: 30px;
+            text-align: center;
+            line-height: 30px;
+            filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));
+        }
+
+        .toggle-container {
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        .toggle-container label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui-container">
+
+    <div class="toggle-container">
+        <label>
+            <input type="checkbox" id="show-streets-toggle" onchange="toggleStreetView()">
+            Alle Straßen anzeigen
+        </label>
+    </div>
+
+    <select id="town-select" onchange="loadSelectedTown()">
+        <option value="" disabled selected>Wähle einen Bezirk</option>
+    </select>
+
+    <h1>Wo ist...</h1>
+    <div id="game-area" style="display:none;">
+        <span id="target-street">Lädt...</span>
+        <div id="feedback"></div>
+        <button id="next-btn" onclick="nextRound()">Nächste Straße ➝</button>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+<script>
+    // bezirke
+    const availableTowns = [
+        { name: "Aschheim", file: "strassenkunde_data/aschheim.geojson" }, // 120
+        { name: "Dornach", file: "strassenkunde_data/dornach.geojson" }, // 46
+        { name: "Aschheim (mit Dornach)", file: "strassenkunde_data/aschheimdornach.geojson" }, // 168
+        { name: "Kirchheim", file: "strassenkunde_data/kirchheim.geojson" }, // 73
+        { name: "Heimstetten", file: "strassenkunde_data/heimstetten.geojson" }, // 80
+        { name: "Feldkirchen", file: "strassenkunde_data/feldkirchen.geojson" } // 91
+        // modular, hier mehr adden
+    ];
+
+    let streetsByName = {};
+    let allStreetNames = [];
+    let currentTargetName = "";
+    let isGuessing = false;
+
+    const map = L.map('map').setView([48.1637, 11.7411], 13); // mitte bereich um münchen ost landkreis
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20
+    }).addTo(map);
+
+    const backgroundLayerGroup = L.layerGroup().addTo(map);  // for highlighting all possible streets
+    const invisibleLayerGroup = L.layerGroup().addTo(map);  // for what is clickable
+    const highlightLayerGroup = L.layerGroup().addTo(map);  // for correct/wrong shit
+    const stationLayerGroup = L.layerGroup().addTo(map);  // feuerwehrhaus
+
+
+    const townSelect = document.getElementById('town-select');
+    availableTowns.forEach(town => {
+        const option = document.createElement('option');
+        option.value = town.file;
+        option.innerText = town.name;
+        townSelect.appendChild(option);
+    });
+
+    // if (availableTowns.length > 0) {
+    //     townSelect.value = availableTowns[0].file;
+    //     loadSelectedTown();
+    // }
+
+    function loadSelectedTown() {
+        const file = document.getElementById('town-select').value;
+        if (!file) return;
+
+        document.getElementById('game-area').style.display = 'block';
+        document.getElementById('target-street').innerText = "Lade Kartendaten...";
+        document.getElementById('target-street').classList.add('loading');
+        document.getElementById('next-btn').style.display = 'none';
+        document.getElementById('feedback').innerText = '';
+
+        backgroundLayerGroup.clearLayers();
+        invisibleLayerGroup.clearLayers();
+        highlightLayerGroup.clearLayers();
+        stationLayerGroup.clearLayers();
+
+        streetsByName = {};
+        allStreetNames = [];
+
+        fetch(file)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.centre) {
+                    map.setView(data.centre, 14);
+
+                    // gerätehaus markierung
+                    const stationIcon = L.divIcon({
+                        className: 'fire-station-icon',
+                        html: '🚒',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20]
+                    });
+
+                    L.marker(data.centre, { icon: stationIcon })
+                        .addTo(stationLayerGroup)
+                        .bindPopup("<b>Feuerwehrhaus</b>")
+                }
+
+                processGeoJSON(data);
+            })
+            .catch(error => {
+                console.error("Could not load data:", error);
+                document.getElementById('target-street').innerText = "[debug] error loading file";
+                document.getElementById('feedback').innerText = "bomboclaat";
+            });
+    }
+
+    function processGeoJSON(data) {
+        if (!data.features) return;
+
+        data.features.forEach(feature => {
+            if (feature.properties && feature.properties.name && feature.geometry && feature.geometry.coordinates) {
+                const name = feature.properties.name;
+                const rawCoords = feature.geometry.coordinates;
+
+                // switch latitude and longitude (thanks leaflet css)
+                const leafletCoords = rawCoords.map(coord => [coord[1], coord[0]]);
+
+                if (!streetsByName[name]) {
+                    streetsByName[name] = [];
+                    allStreetNames.push(name);
+                }
+                streetsByName[name].push(leafletCoords);
+            }
+        });
+
+        console.log(`Loaded ${allStreetNames.length} unique streets.`);
+        drawInvisibleStreets();
+        nextRound();
+    }
+
+    // holy inefficient
+    function drawInvisibleStreets() {
+        // backgroundLayerGroup.clearLayers();
+        allStreetNames.forEach(name => {
+            const segments = streetsByName[name];
+            segments.forEach(latLngs => {
+                // yeahhhh lets just make this invisible or it looks like horse shit if zoomed out
+                const invisiblePoly = L.polyline(latLngs, {
+                    color: 'transparent',
+                    weight: 25,
+                    opacity: 0,
+                    className: 'clickable-street'
+                });
+                invisiblePoly.streetName = name;
+                invisiblePoly.on('click', onStreetClick);
+                invisibleLayerGroup.addLayer(invisiblePoly);
+
+                // light blue line
+                const visiblePoly = L.polyline(latLngs, {
+                    color: '#add8e6', // Very light grey
+                    weight: 4,
+                    opacity: 1,
+                    interactive: false
+                });
+                backgroundLayerGroup.addLayer(visiblePoly);
+            });
+        });
+        toggleStreetView(); // toggle it once so it's off when the checkbox is off
+    }
+
+    function highlightStreet(name, color) {
+        const segments = streetsByName[name];
+        if (!segments) return;
+        segments.forEach(latLngs => {
+            // make red or green depending on correct or dumbass
+            L.polyline(latLngs, {
+                color: color,
+                weight: 6,
+                opacity: 0.8
+            }).addTo(highlightLayerGroup);
+        });
+    }
+
+    function toggleStreetView() {
+        const checkbox = document.getElementById('show-streets-toggle');
+        if (checkbox.checked) {
+            // checked
+            if (!map.hasLayer(backgroundLayerGroup)) {
+                map.addLayer(backgroundLayerGroup);
+            }
+        } else {
+            // unchecked
+            if (map.hasLayer(backgroundLayerGroup)) {
+                map.removeLayer(backgroundLayerGroup);
+            }
+        }
+    }
+
+    function nextRound() {
+        document.getElementById('feedback').innerText = "";
+        document.getElementById('feedback').className = "";
+        document.getElementById('next-btn').style.display = "none";
+        document.getElementById('target-street').classList.remove('loading');
+
+        // idk where this fn is coming from, it's needed but yea idk its 1am
+        highlightLayerGroup.clearLayers();
+
+        if (allStreetNames.length === 0) {
+            document.getElementById('target-street').innerText = "[debug] found no streets";
+            return;
+        }
+
+        // allStreetNames.forEach(name => {highlightStreet(name, "#c0c0c0");})
+
+        const randomIndex = Math.floor(Math.random() * allStreetNames.length);
+        currentTargetName = allStreetNames[randomIndex];
+
+        document.getElementById('target-street').innerText = currentTargetName;
+        isGuessing = true;
+    }
+
+    function onStreetClick(e) {
+        if (!isGuessing) return;
+
+        const clickedName = e.target.streetName;
+        const feedbackEl = document.getElementById('feedback');
+
+        if (clickedName === currentTargetName) {
+            feedbackEl.innerHTML = "✅ Richtig!";
+            feedbackEl.className = "correct";
+            highlightStreet(currentTargetName, '#2e7d32');
+        } else {
+            feedbackEl.innerHTML = `❌ Falsch! Du hast <strong>${clickedName}</strong> geraten.`;
+            feedbackEl.className = "wrong";
+            highlightStreet(clickedName, '#c62828');
+            highlightStreet(currentTargetName, '#2e7d32');
+        }
+
+        isGuessing = false;
+        document.getElementById('next-btn').style.display = "inline-block";
+    }
+</script>
+</body>
+</html>

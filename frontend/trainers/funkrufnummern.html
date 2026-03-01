@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bayerischer Funkrufnamen Trainer - Vollversion</title>
+  <style>  /* COMPLETELY unreadable css we love to see it (this shit took hours XD)*/
+    body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+    .card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; }
+    h1 { color: #b71c1c; margin-top: 0; font-size: 1.4rem; border-bottom: 2px solid #eee; padding-bottom: 1rem; }
+    .question { font-size: 1.2rem; margin: 1.5rem 0; min-height: 6rem; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4; }
+    .highlight { color: #b71c1c; font-weight: bold; font-size: 1.8rem; display: block; margin-top: 10px; }
+    input { width: 100%; padding: 15px; font-size: 1.1rem; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 1rem; box-sizing: border-box; text-align: center; }
+    input:focus { border-color: #b71c1c; outline: none; }
+    .btn-row { display: flex; gap: 10px; }
+    button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+    .btn-primary { background: #b71c1c; color: white; }
+    .btn-primary:hover { background: #8e1616; }
+    .btn-secondary { background: #e0e0e0; color: #333; }
+    #feedback { margin: 1rem 0; font-weight: bold; min-height: 1.5rem; }
+    .correct { color: #2e7d32; }  /* these are being used in check() */
+    .wrong { color: #c62828; }
+    .stats { font-size: 0.8rem; color: #777; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Bayernweite Funkrufnamen (ab 2015)</h1>
+  <div class="question" id="qText">loading</div>
+  <input type="text" id="answer" placeholder="Antwort hier tippen..." autocomplete="off">
+  <div id="feedback"></div>
+  <div class="btn-row">
+    <button class="btn-primary" onclick="check()">Prüfen</button>
+    <button class="btn-secondary" onclick="next()">Weiter</button>
+  </div>
+</div>
+
+<script>
+  const db = [
+    // 0X: Einrichtungen und Funktionen
+    { id: "00", names: ["Feuerwehrhaus", "FwH", "Kreiseinsatzzentrale", "KEZ", "Funkzentrale", "Zentrale", "Funkstelle FüGK", "FüGK", "Gerätehaus"] },
+    { id: "01", names: ["Kommandant", "Kdt.", "Stadtbrandrat", "SBR", "Kreisbrandrat", "KBR", "Leiter Berufsfeuerwehr", "Leiter HAW", "Leiter"] },
+    { id: "02", names: ["Kommandant-Stellvertreter", "Kdt.-Stv.", "Leiter stv.", "Stellvertretender Leiter", "Stellvertretender Kommandant", "Stelvertretender Kdt"] },
+    { id: "03", names: ["Örtlicher Einsatzleiter", "ÖEL", "weitere Führungsfunktion"] },
+    { id: "08", names: ["Leiter luK"] },
+    { id: "09", names: ["sonstige Funktion", "Sonstige"] },
+
+    // 1X: Führungsfahrzeuge
+    { id: "10", names: ["Kommandowagen", "KdoW", "Zugtrupp"] },
+    { id: "11", names: ["Mehrzweckfahrzeug", "MZF"] },
+    { id: "12", names: ["Einsatzleitwagen 1", "ELW 1"] },
+    { id: "13", names: ["Einsatzleitwagen 2", "ELW 2"] },
+    { id: "14", names: ["Mannschaftswagen", "MTW", "Mannschaftstransportwagen"] },
+    { id: "15", names: ["Luftbeobachter", "LuBeo", "Flughelfer"] },
+    { id: "16", names: ["Fernmeldekraftwagen", "FMKW"] },
+    { id: "17", names: ["Kraftrad", "Krad"] },
+    { id: "18", names: ["Feuersicherheitswache-Trupp", "FSW-Trp"] },
+
+    // 2X: Tanklöschfahrzeuge
+    { id: "20", names: ["Tanklöschfahrzeug 16/25 mit Rettungssatz", "TLF 16/25", "TLF 16/25 mit Rettungssatz"] },
+    { id: "21", names: ["Tanklöschfahrzeug 3000", "TLF 3000", "Tanklöschfahrzeug 16/25"] },
+    { id: "22", names: ["Tanklöschfahrzeug 2000", "TLF 2000", "Tanklöschfahrzeug 8/18", "Tanklöschfahrzeug 16/24"] },
+    { id: "23", names: ["Tanklöschfahrzeug 4000", "TLF 4000", "Tanklöschfahrzeug 24/48", "Tanklöschfahrzeug 24/50", "TLF 24/48", "TLF 24/50"] },
+    { id: "25", names: ["Trockenlöschfahrzeug", "TroLF"] },
+    { id: "26", names: ["Zumischerlöschfahrzeug", "ZLF"] },
+    { id: "27", names: ["Sonderlöschmittelfahrzeug", "SLF"] },
+    { id: "29", names: ["Flugfeldlöschfahrzeug", "Sondertanklöschfahrzeug"] },
+
+    // 3X: Hubrettungs- / Wechsellader
+    { id: "30", names: ["Drehleiter 23/12", "DLK 23/12", "DLA(K) 23/12"] },
+    { id: "31", names: ["Drehleiter 18/12", "DLK 18/12", "DLA(K) 18/12"] },
+    { id: "32", names: ["Drehleiter 12/9", "Drehleiter 16/4", "DL 12/9", "DL 16/4"] },
+    { id: "33", names: ["Gelenkmast", "Teleskopmast", "Teleskopgelenkmast", "sonstiges Hubrettungsfahrzeug"] },
+    { id: "34", names: ["Kranwagen", "KW"] },
+    { id: "35", names: ["Wechselladerfahrzeug kurz", "WLF kurz"] },
+    { id: "36", names: ["Wechselladerfahrzeug lang", "WLF lang"] },
+    { id: "38", names: ["Rettungstreppe"] },
+    { id: "39", names: ["Bagger", "Stapler", "Teleskoplader", "Hubarbeitsgerät"] },
+
+    // 4X: Löschfahrzeuge
+    { id: "40", names: ["Hilfeleistungslöschgruppenfahrzeug 20", "HLF 20", "LF 16/12 mit Rettungssatz"] },
+    { id: "41", names: ["Löschgruppenfahrzeug 20", "LF 20", "LF-KatS"] },
+    { id: "42", names: ["Hilfeleistungslöschgruppenfahrzeug 10", "HLF 10", "LF 10/6 mit Rettungssatz", "LF 8/6 mit Rettungssatz"] },
+    { id: "43", names: ["Löschgruppenfahrzeug 10", "LF 10", "LF 10/6", "LF 8/6"] },
+    { id: "44", names: ["Tragkraftspritzenfahrzeug", "TSF", "TSF mit Atemschutz"] },
+    { id: "45", names: ["Tragkraftspritzenanhänger", "TSA"] },
+    { id: "46", names: ["Tragkraftspritzenfahrzeug-Wasser", "TSF-W"] },
+    { id: "47", names: ["Mittleres Löschfahrzeug", "MLF", "Staffellöschfahrzeug"] },
+    { id: "48", names: ["Löschgruppenfahrzeug 16-TS", "LF 16-TS", "LF 8-1", "LF 8-2"] },
+    { id: "49", names: ["Kleinlöschfahrzeug", "KLF", "sonstiges Löschfahrzeug"] },
+
+    // 5X: Gerätewagen / Logistik
+    { id: "50", names: ["Gerätewagen", "GW", "Personenkraftwagen", "PKW", "PKW-Kombi"] },
+    { id: "51", names: ["Gerätewagen Öl", "GW-Öl", "Rüstwagen Öl"] },
+    { id: "52", names: ["Gerätewagen Gefahrgut", "GW-G"] },
+    { id: "53", names: ["Gerätewagen Atemschutz", "GW-A", "Gerätewagen Strahlenschutz", "GW-A/S"] },
+    { id: "55", names: ["Gerätewagen Logistik 1", "GW-L1", "LKW bis 7,5t"] },
+    { id: "56", names: ["Gerätewagen Logistik 2", "GW-L2", "LKW über 7,5t"] },
+    { id: "57", names: ["Schlauchwagen 1000", "SW 1000"] },
+    { id: "58", names: ["Schlauchwagen 2000", "SW 2000"] },
+    { id: "59", names: ["GW Umwelt", "GW Tierrettung", "GW Tiertransport", "GW Höhenrettung", "Gerätewagen sonstiger"] },
+
+    // 6X: Rüstwagen / Sonder
+    { id: "60", names: ["Rüstwagen 3", "RW 3"] },
+    { id: "61", names: ["Rüstwagen", "RW", "Rüstwagen 2", "RW 2"] },
+    { id: "62", names: ["Rüstwagen 1", "RW 1", "Vorausrüstwagen", "VRW"] },
+    { id: "63", names: ["Stromgeneratorfahrzeug", "Lichtmastfahrzeug", "Rüstwagen sonstiger"] },
+    { id: "65", names: ["Kleinalarmfahrzeug", "KlaF"] },
+    { id: "66", names: ["ABC-Erkunder", "Gerätewagen Messtechnik"] },
+    { id: "67", names: ["Dekontaminationsmehrzweckfahrzeug", "Gerätewagen Dekon-P"] },
+    { id: "68", names: ["Gerätewagen Dekon-V"] },
+
+    // 7X: Landrettungsdienst
+    { id: "70", names: ["Notarztwagen", "NAW", "Intensiv-Transportwagen", "ITW"] },
+    { id: "71", names: ["Rettungswagen", "RTW", "Infektions-Rettungswagen", "Schwerlast-Rettungswagen"] },
+    { id: "72", names: ["Krankentransportwagen", "KTW"] },
+    { id: "73", names: ["Krankentransportwagen 4 Tragen", "Krankentransportwagen Typ B"] },
+    { id: "74", names: ["sonstiges Rettungsdienstfahrzeug"] },
+    { id: "75", names: ["Großraum-Rettungswagen", "GRTW"] },
+    { id: "76", names: ["Notarzteinsatzfahrzeug", "NEF", "Verlegungsarzteinsatzfahrzeug"] },
+    { id: "77", names: ["Arzttruppwagen"] },
+    { id: "78", names: ["SAN-Trupp"] },
+    { id: "79", names: ["First Responder", "Helfer vor Ort", "HvO", "FR"] },
+
+    // 8X: Bergrettung
+    { id: "80", names: ["Einsatzmittel Bergrettung"] },
+    { id: "81", names: ["Bergrettungsfahrzeug"] },
+    { id: "84", names: ["Gerätewagen Höhlenrettung"] },
+    { id: "88", names: ["Fachberater Bergrettung"] },
+
+    // 9X: Wasserrettung
+    { id: "91", names: ["GW Taucher", "GW Wasserrettung", "Gerätewagen Boot", "GW Boot"] },
+    { id: "94", names: ["MTW-Wasserrettung"] },
+    { id: "98", names: ["Wasserrettung Trupp", "Rettungsschwimmer", "Wasserretter", "Streife"] },
+    { id: "99", names: ["Boot"] }
+  ];
+
+  let currentItem, mode;
+  //const statsDiv = document.getElementById('stats');
+  //statsDiv.innerText = `Geladene Einträge: ${db.length}`;
+  console.log("debug:", db.length)
+
+  function next() {
+    currentItem = db[Math.floor(Math.random() * db.length)];
+    mode = Math.random() > 0.5 ? 'idToName' : 'nameToId';
+    const qText = document.getElementById('qText');
+    const feedback = document.getElementById('feedback');
+    const input = document.getElementById('answer');
+
+    feedback.innerText = "";
+    input.value = "";
+    input.style.borderColor = "#ddd";
+    input.focus();
+
+    if (mode === 'idToName') {
+      qText.innerHTML = `Bezeichnung für Kennzahl:<span class="highlight">${currentItem.id}</span>`;
+    } else {
+      const name = currentItem.names[Math.floor(Math.random() * currentItem.names.length)];
+      qText.innerHTML = `Kennzahl für:<span class="highlight" style="font-size:1.3rem;">${name}</span>`;
+    }
+  }
+
+  function check() {
+    const val = document.getElementById('answer').value.trim().toLowerCase();
+    const feedback = document.getElementById('feedback');
+    const input = document.getElementById('answer');
+    let correct = false;
+
+    if (mode === 'idToName') {
+      correct = currentItem.names.some(n => n.toLowerCase() === val);
+    } else {
+      correct = (val === currentItem.id);
+    }
+
+    if (correct) {
+      feedback.innerText = "Richtig! ✓";
+      feedback.className = "correct";  // disgusting use of css override
+      input.style.borderColor = "#2e7d32";
+    } else {
+      const solution = mode === 'idToName' ? currentItem.names[0] : currentItem.id;
+      feedback.innerText = `Falsch. Richtig wäre: ${solution}`;
+      feedback.className = "wrong";
+      input.style.borderColor = "#c62828";
+    }
+  }
+
+  // why is it so annoying to implement when it should go next and when it should check for fucks sake
+  document.getElementById('answer').addEventListener('keypress', e => {
+    if (e.key === 'Enter') {
+      if (document.getElementById('feedback').innerText === "") check();
+      else next();
+    }
+  });
+
+  next();
+</script>
+
+</body>
+</html>

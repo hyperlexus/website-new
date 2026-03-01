@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kana Trainer Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            touch-action: manipulation;
+        }
+        .kana-char {
+            font-family: 'Noto Sans JP', sans-serif;
+            line-height: 1.2;
+            letter-spacing: 0.05em;
+        }
+        .mode-btn, .type-btn { cursor: pointer; user-select: none; }
+        .focus-pink-500:focus {
+            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.5);
+        }
+        .active-type {
+            background-color: #ec4899 !important;
+            border-color: #ec4899 !important;
+            color: white !important;
+        }
+        .active-mode {
+            background-color: #06b6d4 !important;
+            color: white !important;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+<div class="w-full max-w-2xl mx-auto">
+    <header class="text-center mb-6">
+        <h1 class="text-4xl md:text-5xl font-bold text-pink-500">かな トレーナー</h1>
+        <p class="text-gray-400 mt-2 italic">Natural frequency weighted</p>
+    </header>
+
+    <div id="type-select" class="flex justify-center gap-4 mb-6">
+        <button data-type="hiragana" class="type-btn active-type w-32 py-2 rounded-full border-2 border-gray-700 font-bold transition-all">ひらがな</button>
+        <button data-type="katakana" class="type-btn w-32 py-2 rounded-full border-2 border-gray-700 font-bold transition-all">カタカナ</button>
+    </div>
+
+    <div id="mode-select" class="flex justify-center gap-3 mb-8">
+        <button data-mode="single" class="mode-btn text-sm sm:text-base bg-gray-700 hover:bg-gray-600 font-semibold py-2 px-6 rounded-lg">Single</button>
+        <button data-mode="multi" class="mode-btn text-sm sm:text-base bg-gray-700 hover:bg-gray-600 font-semibold py-2 px-6 rounded-lg">Multi (3-5)</button>
+    </div>
+
+    <main id="game-area" class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl text-center transition-opacity duration-500 opacity-0 pointer-events-none">
+        <div id="character-display" class="kana-char font-bold mb-4 min-h-[8rem] flex flex-wrap items-center justify-center text-white transition-all duration-200">
+            <span class="opacity-50 text-4xl">Ready?</span>
+        </div>
+
+        <input type="text" id="answer-input" placeholder="Type Romaji..." autocomplete="off" spellcheck="false" class="w-full max-w-md mx-auto bg-gray-900 border-2 border-gray-600 rounded-lg py-3 px-4 text-center text-xl text-white outline-none focus-pink-500 transition-all duration-200" disabled>
+
+        <div id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 text-gray-300">
+            <div class="flex flex-col items-center">
+                <span class="text-xs text-gray-500 uppercase tracking-wider">Score</span>
+                <span id="score" class="font-semibold text-xl">0/0</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-xs text-gray-500 uppercase tracking-wider">Accuracy</span>
+                <span id="accuracy" class="font-semibold text-xl">0%</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-xs text-gray-500 uppercase tracking-wider">Total Time</span>
+                <span id="timer" class="font-semibold text-xl">0s</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-xs text-gray-500 uppercase tracking-wider">Time/Kana</span>
+                <span id="avg-kana-time" class="font-semibold text-xl">0s</span>
+            </div>
+        </div>
+
+        <button id="stop-btn" class="mt-8 bg-red-600 hover:bg-red-700 transition-colors duration-200 font-bold py-2 px-8 rounded-lg text-white" style="display: none;">End Session</button>
+    </main>
+
+    <div id="results-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center p-4 z-20">
+        <div class="bg-gray-800 text-center p-8 rounded-2xl shadow-2xl max-w-md w-full animate-fade-in">
+            <h2 class="text-3xl font-bold text-cyan-400 mb-4">Results</h2>
+            <div id="final-stats-container" class="grid grid-cols-2 gap-4 text-left my-6 border-y border-gray-700 py-4">
+                <div><p class="text-gray-400">Score:</p><p id="final-score" class="text-2xl font-semibold"></p></div>
+                <div><p class="text-gray-400">Accuracy:</p><p id="final-accuracy" class="text-2xl font-semibold"></p></div>
+                <div><p class="text-gray-400">Total Time:</p><p id="final-time" class="text-2xl font-semibold"></p></div>
+                <div><p class="text-gray-400">Avg/Kana:</p><p id="final-avg" class="text-2xl font-semibold"></p></div>
+            </div>
+            <button id="restart-btn" class="w-full bg-pink-600 hover:bg-pink-700 font-bold py-3 px-6 rounded-lg text-white">Restart</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BASIC_H = {'あ':'a','い':'i','う':'u','え':'e','お':'o','か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko','さ':'sa','し':'shi','す':'su','せ':'se','そ':'so','た':'ta','ち':'chi','つ':'tsu','て':'te','と':'to','な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no','は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho','ま':'ma','み':'mi','む':'mu','め':'me','も':'mo','や':'ya','ゆ':'yu','よ':'yo','ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro','わ':'wa','を':'wo','ん':'n'};
+    const DAKUTEN_H = {'が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go','ざ':'za','じ':'ji','ず':'zu','ぜ':'ze','ぞ':'zo','だ':'da','ぢ':'ji','づ':'zu','で':'de','ど':'do','ば':'ba','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo','ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po'};
+    const DIGRAPHS_H = {'きゃ':'kya','きゅ':'kyu','きょ':'kyo','しゃ':'sha','しゅ':'shu','しょ':'sho','ちゃ':'cha','ちゅ':'chu','ちょ':'cho','にゃ':'nya','にゅ':'nyu','にょ':'nyo','ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo','みゃ':'mya','みゅ':'myu','みょ':'myo','りゃ':'rya','りゅ':'ryu','りょ':'ryo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo','じゃ':'ja','じゅ':'ju','じょ':'jo','びゃ':'bya','びゅ':'byu','びょ':'byo','ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo'};
+
+    const BASIC_K = {'ア':'a','イ':'i','ウ':'u','エ':'e','オ':'o','カ':'ka','キ':'ki','ク':'ku','ケ':'ke','コ':'ko','サ':'sa','シ':'shi','ス':'su','セ':'se','ソ':'so','タ':'ta','チ':'chi','ツ':'tsu','テ':'te','ト':'to','ナ':'na','ニ':'ni','ヌ':'nu','ネ':'ne','ノ':'no','ハ':'ha','ヒ':'hi','フ':'fu','ヘ':'he','ホ':'ho','マ':'ma','ミ':'mi','ム':'mu','メ':'me','モ':'mo','ヤ':'ya','ユ':'yu','ヨ':'yo','ラ':'ra','リ':'ri','ル':'ru','レ':'re','ロ':'ro','ワ':'wa','ヲ':'wo','ン':'n'};
+    const DAKUTEN_K = {'ガ':'ga','ギ':'gi','グ':'gu','ゲ':'ge','ゴ':'go','ザ':'za','ジ':'ji','ズ':'zu','ゼ':'ze','ゾ':'zo','ダ':'da','ヂ':'ji','ヅ':'zu','デ':'de','ド':'do','バ':'ba','ビ':'bi','ブ':'bu','ベ':'be','ボ':'bo','パ':'pa','ピ':'pi','プ':'pu','ぺ':'pe','ポ':'po'};
+    const DIGRAPHS_K = {'キャ':'kya','キュ':'kyu','キョ':'kyo','シャ':'sha','シュ':'shu','ショ':'sho','チャ':'cha','チュ':'chu','チョ':'cho','ニャ':'nya','ニュ':'nyu','ニョ':'nyo','ヒャ':'hya','ヒュ':'hyu','ヒョ':'hyo','ミャ':'mya','ミュ':'myu','ミョ':'myo','リャ':'rya','リュ':'ryu','リョ':'ryo','ギャ':'gya','ギュ':'gyu','ギョ':'gyo','ジャ':'ja','ジョ':'jo','ビャ':'bya','ビュ':'byu','ビョ':'byo','ピャ':'pya','ピュ':'pyu','ピョ':'pyo'};
+
+    let state = {
+        isActive: false, scriptType: 'hiragana', mode: null,
+        score: 0, attempts: 0,
+        totalCharactersSeen: 0,
+        currentCharCount: 0,
+        startTime: null, timerInterval: null,
+        target: '', answer: ''
+    };
+
+    const elements = {
+        charDisp: document.getElementById('character-display'),
+        input: document.getElementById('answer-input'),
+        gameArea: document.getElementById('game-area'),
+        results: document.getElementById('results-modal'),
+        stopBtn: document.getElementById('stop-btn')
+    };
+
+    function generate() {
+        let display = '';
+        let romaji = '';
+
+        // i love this {... thing
+        const stdPool = state.scriptType === 'hiragana' ?
+            {...BASIC_H, ...DAKUTEN_H} : {...BASIC_K, ...DAKUTEN_K};
+        const digPool = state.scriptType === 'hiragana' ? DIGRAPHS_H : DIGRAPHS_K;
+
+        const stdKeys = Object.keys(stdPool);
+        const digKeys = Object.keys(digPool);
+
+        state.currentCharCount = state.mode === 'single' ? 1 : Math.floor(Math.random() * 3) + 3;
+
+        for(let i=0; i < state.currentCharCount; i++) {
+            // 10% chance for digraph (byo myu etc)
+            const isDigraph = Math.random() < 0.1;
+            let char;
+
+            if (isDigraph) {
+                char = digKeys[Math.floor(Math.random() * digKeys.length)];
+                romaji += digPool[char];
+            } else {
+                char = stdKeys[Math.floor(Math.random() * stdKeys.length)];
+                romaji += stdPool[char];
+            }
+            display += char;
+        }
+
+        state.target = display;
+        state.answer = romaji;
+
+        elements.charDisp.classList.remove('text-7xl', 'sm:text-8xl', 'md:text-9xl', 'text-4xl', 'sm:text-5xl', 'md:text-6xl');
+        if (state.mode === 'multi') {
+            elements.charDisp.classList.add('text-4xl', 'sm:text-5xl', 'md:text-6xl');
+        } else {
+            elements.charDisp.classList.add('text-7xl', 'sm:text-8xl', 'md:text-9xl');
+        }
+        elements.charDisp.textContent = display;
+    }
+
+    function updateUI() {
+        document.getElementById('score').textContent = `${state.score}/${state.attempts}`;
+        const acc = state.attempts > 0 ? Math.round((state.score/state.attempts)*100) : 0;
+        document.getElementById('accuracy').textContent = `${acc}%`;
+
+        if (state.startTime) {
+            const elapsed = (Date.now() - state.startTime) / 1000;
+            document.getElementById('timer').textContent = `${elapsed.toFixed(1)}s`;
+            const avg = state.totalCharactersSeen > 0 ? (elapsed / state.totalCharactersSeen).toFixed(2) : 0;
+            document.getElementById('avg-kana-time').textContent = `${avg}s`;
+        }
+    }
+
+    function check() {
+        const val = elements.input.value.trim().toLowerCase();
+        if (!val) return;
+
+        if (!state.startTime) {
+            state.startTime = Date.now();
+            state.timerInterval = setInterval(updateUI, 100);
+        }
+
+        state.attempts++;
+        state.totalCharactersSeen += state.currentCharCount;
+
+        const isCorrect = val === state.answer;
+        elements.charDisp.classList.remove('text-green-400', 'text-red-400', 'scale-105');
+        void elements.charDisp.offsetWidth;
+
+        if (isCorrect) {
+            state.score++;
+            elements.charDisp.classList.add('text-green-400');
+        } else {
+            elements.charDisp.classList.add('text-red-400');
+            const fontSizeClass = state.mode === 'multi' ? 'text-xl' : 'text-3xl';
+            elements.charDisp.innerHTML = `${state.target} <span class="${fontSizeClass} text-gray-500 ml-4 font-normal tracking-wider">${state.answer}</span>`;
+        }
+
+        elements.charDisp.classList.add('scale-105');
+        setTimeout(() => {
+            elements.charDisp.classList.remove('scale-105');
+            elements.input.value = '';
+            generate();
+            updateUI();
+        }, 800);
+    }
+
+    document.getElementById('type-select').addEventListener('click', e => {
+        if (e.target.dataset.type) {
+            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active-type'));
+            e.target.classList.add('active-type');
+            state.scriptType = e.target.dataset.type;
+            if(state.isActive) generate();
+        }
+    });
+
+    document.getElementById('mode-select').addEventListener('click', e => {
+        if (e.target.dataset.mode) {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active-mode'));
+            e.target.classList.add('active-mode');
+            state.mode = e.target.dataset.mode;
+            start();
+        }
+    });
+
+    function start() {
+        state.isActive = true; state.score = 0; state.attempts = 0;
+        state.totalCharactersSeen = 0; state.startTime = null;
+        clearInterval(state.timerInterval);
+        elements.gameArea.classList.remove('opacity-0', 'pointer-events-none');
+        elements.input.disabled = false;
+        elements.stopBtn.style.display = 'inline-block';
+        generate();
+        elements.input.focus();
+        updateUI();
+    }
+
+    function stop() {
+        state.isActive = false;
+        clearInterval(state.timerInterval);
+        const elapsed = state.startTime ? ((Date.now() - state.startTime) / 1000) : 0;
+        const avg = state.totalCharactersSeen > 0 ? (elapsed / state.totalCharactersSeen).toFixed(2) : 0;
+
+        document.getElementById('final-score').textContent = `${state.score}/${state.attempts}`;
+        document.getElementById('final-accuracy').textContent = `${state.attempts > 0 ? Math.round((state.score/state.attempts)*100) : 0}%`;
+        document.getElementById('final-time').textContent = `${elapsed.toFixed(1)}s`;
+        document.getElementById('final-avg').textContent = `${avg}s`;
+        elements.results.classList.remove('hidden');
+    }
+
+    elements.input.addEventListener('keydown', e => { if(e.key === 'Enter') check(); });
+    elements.stopBtn.addEventListener('click', stop);
+    document.getElementById('restart-btn').addEventListener('click', () => {
+        elements.results.classList.add('hidden');
+        elements.gameArea.classList.add('opacity-0', 'pointer-events-none');
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active-mode'));
+    });
+</script>
+</body>
+</html>
