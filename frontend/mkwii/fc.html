@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HyperLexus' fc tools :D</title>
+
+    <meta property="og:title" content="fc tools" />
+    <meta property="og:description" content="import an rkp and change its assigned fc, or do a web-based pinfo :D" />
+    <meta property="og:url" content="https://hyperlexus.uk/mkwii/fc" />
+    <meta name="theme-color" content="#7B68EE"> 
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako_inflate.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f0ff; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .btn-primary { background-color: #7B68EE; transition: all 0.2s; }
+        .btn-primary:hover:not(:disabled) { background-color: #6A5ACD; transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+    </style>
+</head>
+<body class="min-h-screen py-10 px-4">
+<div class="max-w-4xl mx-auto space-y-8">
+
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-indigo-900 tracking-tight">HyperLexus' fc tools</h1>
+    </div>
+
+    <div class="glass p-8 rounded-3xl shadow-xl border border-white">
+        <h2 class="text-xl font-semibold text-indigo-800 mb-4 flex items-center">
+            <span class="mr-2"></span> Is this FC taken?
+        </h2>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <input id="pinfoInput" type="text" placeholder="Enter FC or pid to query" class="flex-1 p-3 rounded-xl border-2 border-indigo-100 focus:border-indigo-400 outline-none">
+            <button onclick="handlePinfo()" class="btn-primary text-white px-8 py-3 rounded-xl font-semibold shadow-md">Check</button>
+        </div>
+        <div id="pinfoResult" class="mt-4 p-4 rounded-xl bg-white/50 border border-indigo-50 hidden text-indigo-900"></div>
+    </div>
+
+    <div class="glass p-8 rounded-3xl shadow-xl border border-white">
+        <h2 class="text-xl font-semibold text-indigo-800 mb-4 flex items-center">
+            <span class="mr-2"></span> Overwrite FC stored in .rkp (change the FC for a licence)
+        </h2>
+        <div class="space-y-4">
+            <input id="rkpIdInput" type="text" placeholder="Target FC/PID (make sure it's free!)" class="w-full p-3 rounded-xl border-2 border-indigo-100 focus:border-indigo-400 outline-none">
+
+            <div class="relative group">
+                <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-indigo-200 border-dashed rounded-xl cursor-pointer bg-white/30 group-hover:bg-indigo-50/50 transition">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <p id="fileName" class="text-sm text-indigo-600 font-medium">select or drop .rkp file</p>
+                    </div>
+                    <input id="rkpFile" type="file" class="hidden" accept=".rkp" onchange="updateFileName()"/>
+                </label>
+            </div>
+
+            <button onclick="" class="w-full btn-primary text-white py-4 rounded-xl font-bold shadow-lg tracking-wider disabled">Patch (out of order)</button>
+            <p id="rkpStatus" class="text-sm text-center font-medium"></p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <div class="glass p-8 rounded-3xl shadow-xl border border-white h-full flex flex-col">
+            <h2 class="text-xl font-semibold text-indigo-800 mb-4 flex items-center justify-center text-center">
+                FC gambling!
+            </h2>
+            <div class="flex-col items-center text-center space-y-4 flex-1 justify-center">
+                <p class="text-sm text-indigo-600 font-medium">the fc slot machine outputs a random valid free fc 😊</p>
+                <button id="randomBtn" onclick="handleRandomFC()" class="btn-primary text-white px-8 py-3 rounded-xl font-semibold shadow-md w-full sm:w-auto">roll</button>
+                <div id="randomResult" class="mt-2 w-full rounded-xl bg-white/50 border border-indigo-50 hidden text-indigo-900"></div>
+            </div>
+        </div>
+
+        <div class="glass p-8 rounded-3xl shadow-xl border border-white h-full flex flex-col">
+            <h2 class="text-xl font-semibold text-indigo-800 mb-4 flex items-center justify-center text-center">
+                Convert between friend code and PID
+            </h2>
+            <div class="flex flex-col gap-2 flex-1 justify-center">
+                <input id="convInput" type="text" placeholder="Enter FC or PID" class="w-full p-3 rounded-xl border-2 border-indigo-100 focus:border-indigo-400 outline-none text-center">
+                <button onclick="handleConvert()" class="btn-primary text-white w-full py-3 rounded-xl font-semibold shadow-md">convert</button>
+                <div id="convResult" class="mt-4 text-center text-lg text-indigo-900 min-h-[3rem]"></div>
+            </div>
+        </div>
+
+    </div>
+    <div class="text-center">
+        <p>credits to lex for the fc gambling idea :bsmiley:</p>
+        <p>thanks to ki for help with css and lots of laughing while making this &lt;3</p>
+    </div>
+
+</div>
+
+<script>
+    // --- CORE LOGIC ---
+    function pidToFc(pid) {
+        if (!pid || pid === 0) return "0";
+        const buffer = new ArrayBuffer(8);
+        const view = new DataView(buffer);
+        view.setUint32(0, pid, true);
+        const jcmr = [74, 67, 77, 82];
+        const uint8 = new Uint8Array(buffer);
+        for(let i = 0; i < 4; i++) uint8[4 + i] = jcmr[i];
+        const spark = new SparkMD5.ArrayBuffer();
+        spark.append(buffer);
+        const hexHash = spark.end();
+        const firstByte = parseInt(hexHash.substring(0, 2), 16);
+        const high = BigInt(firstByte >> 1);
+        const fcBigInt = (high << 32n) | BigInt(pid);
+        return fcBigInt.toString();
+    }
+
+    function fcToPid(fc) {
+        const cleaned = fc.replace(/-/g, "");
+        return Number(BigInt(cleaned) & 0xFFFFFFFFn);
+    }
+
+    function formatFc(fcStr) {
+        const padded = fcStr.padStart(12, '0');
+        return `${padded.slice(0, 4)}-${padded.slice(4, 8)}-${padded.slice(8)}`;
+    }
+
+    function crc32(buffer) {
+        let table = new Uint32Array(256);
+        for (let i = 0; i < 256; i++) {
+            let c = i;
+            for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            table[i] = c;
+        }
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < buffer.length; i++) {
+            crc = (crc >>> 8) ^ table[(crc ^ buffer[i]) & 0xFF];
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    // --- NEW: STICK MOVEMENT CALCULATOR ---
+    function calculateStickMovements(fc) {
+        // Map the grid (X, Y). '1' is top-left (0,0). '0' is bottom-middle (1,3).
+        const pad = {
+            '1': [0, 0], '2': [1, 0], '3': [2, 0],
+            '4': [0, 1], '5': [1, 1], '6': [2, 1],
+            '7': [0, 2], '8': [1, 2], '9': [2, 2],
+                         '0': [1, 3]
+        };
+        
+        const cleanFc = fc.replace(/-/g, '');
+        let currentPos = pad['1'];
+        let moves = 0;
+
+        for (let i = 0; i < cleanFc.length; i++) {
+            const targetPos = pad[cleanFc[i]];
+            moves += Math.abs(currentPos[0] - targetPos[0]) + Math.abs(currentPos[1] - targetPos[1]);
+            currentPos = targetPos;
+        }
+        return moves;
+    }
+
+    function updateFileName() {
+        const file = document.getElementById('rkpFile').files[0];
+        if (file) document.getElementById('fileName').innerText = file.name;
+    }
+
+    // --- UI HANDLERS ---
+    function handleConvert() {
+        const val = document.getElementById('convInput').value.trim();
+        const resEl = document.getElementById('convResult');
+
+        if (!val) return;
+
+        if (val.includes("-")) {
+            resEl.innerHTML = `<strong>PID:</strong> ${fcToPid(val)}`;
+        } else {
+            const pid = parseInt(val);
+            if (isNaN(pid)) {
+                resEl.innerHTML = "Invalid input";
+                return;
+            }
+            const fcRaw = pidToFc(pid);
+            const formatted = formatFc(fcRaw);
+            const stickMoves = calculateStickMovements(formatted);
+            resEl.innerHTML = `
+                FC: ${formatted}
+                <div class="text-sm text-indigo-500 font-medium mt-1">🕹️ Stick Moves to Type: ${stickMoves}</div>
+            `;
+        }
+    }
+
+    async function handlePinfo() {
+        const input = document.getElementById('pinfoInput').value.trim();
+        const box = document.getElementById('pinfoResult');
+
+        if (!input) return;
+
+        let pid;
+        let extraInfoHtml = ""; 
+
+        const isFcInput = input.includes("-") || input.length === 12;
+
+        if (isFcInput) {
+            // --- FC INPUT LOGIC ---
+            const cleanedInput = input.replace(/-/g, "");
+            pid = fcToPid(input);
+            const trueFc = pidToFc(pid).padStart(12, '0');
+            
+            if (cleanedInput !== trueFc) {
+                box.classList.remove('hidden');
+                box.innerHTML = `
+                    <span class="text-red-600 font-bold">❌ Invalid Friend Code!</span><br>
+                    <span class="text-sm text-indigo-800 mt-2 block">
+                        This specific combination of numbers is mathematically impossible.<br>
+                        (Did you mean: <strong class="text-indigo-900">${formatFc(trueFc)}</strong>?)
+                    </span>`;
+                return; 
+            }
+
+            const formattedFc = formatFc(trueFc);
+            const stickMoves = calculateStickMovements(formattedFc);
+
+            extraInfoHtml = `
+            <br><strong>PID:</strong> ${pid}<br>
+            <span class="relative group cursor-help inline-block">
+                <strong class="underline decoration-dashed decoration-indigo-400 underline-offset-4">Stick movements to add:</strong>
+                <span class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2 bg-indigo-900 text-indigo-50 text-xs rounded-lg shadow-xl z-10 text-center font-normal leading-tight pointer-events-none">
+                    how many times you have to move your stick to type this code on the WFC 'Add Friends' screen
+                    <svg class="absolute text-indigo-900 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255" xml:space="preserve"><polygon class="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
+                </span>
+            </span> ${stickMoves}
+            `;
+
+        } else {
+            pid = parseInt(input);
+            if (isNaN(pid)) {
+                box.classList.remove('hidden');
+                box.innerHTML = `<span class="text-red-500 font-bold">Invalid input format.</span>`;
+                return;
+            }
+            
+            const generatedFc = formatFc(pidToFc(pid));
+            const stickMoves = calculateStickMovements(generatedFc);
+
+            extraInfoHtml = `
+            <br><strong>FC:</strong> ${generatedFc}<br>
+            <span class="relative group cursor-help inline-block">
+                <strong class="underline decoration-dashed decoration-indigo-400 underline-offset-4">Stick movements to add:</strong>
+                <span class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2 bg-indigo-900 text-indigo-50 text-xs rounded-lg shadow-xl z-10 text-center font-normal leading-tight pointer-events-none">
+                    how many times you have to move your stick to type this code on the WFC 'Add Friends' screen
+                    <svg class="absolute text-indigo-900 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255" xml:space="preserve"><polygon class="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
+                </span>
+            </span> ${stickMoves}
+            `
+        }
+
+        box.classList.remove('hidden');
+        box.innerHTML = `<span class="animate-pulse text-indigo-600">verifying...</span>`;
+
+        try {
+            const response = await fetch("https://api.hyperlexus.uk/api/pinfo", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pid })
+            });
+            
+            const data = await response.json();
+            
+            if (data.User) {
+                let isCurrentlyBanned = false;
+                let banExtraInfo = "";
+
+                if (data.User.Restricted && data.User.BanExpires) {
+                    const expireDate = new Date(data.User.BanExpires);
+                    const now = new Date();
+
+                    if (expireDate > now) {
+                        isCurrentlyBanned = true;
+                        const formattedDate = expireDate.toLocaleDateString() + ' ' + expireDate.toLocaleTimeString();
+                        const reason = data.User.BanReason ? `"${data.User.BanReason}"` : "No reason provided";
+                        banExtraInfo = `<br><span class="text-sm text-red-600 ml-4">↳ Expires: ${formattedDate}</span>
+                                        <br><span class="text-sm text-red-600 ml-4">↳ Reason: ${reason}</span>`;
+                    }
+                }
+
+                const banStatusText = isCurrentlyBanned ? `🔴 Yes${banExtraInfo}` : `🟢 No`;
+
+                box.innerHTML = `<strong>Taken by:</strong> ${data.User.LastInGameSn}<br>
+                                 <strong>Banned:</strong> ${banStatusText}
+                                 ${extraInfoHtml}`;
+            } else {
+                box.innerHTML = `<span class="text-green-600 font-bold">✅ This FC is free!</span>
+                                 ${extraInfoHtml}`;
+            }
+        } catch (e) {
+            box.innerHTML = `<span class="text-red-500">${e.message || e}</span>`;
+        }
+    }
+
+    async function handleRkpProcess() {
+        const fileInput = document.getElementById('rkpFile');
+        const idInput = document.getElementById('rkpIdInput').value.trim();
+        const status = document.getElementById('rkpStatus');
+
+        if (!fileInput.files[0] || !idInput) {
+            status.innerText = "pls make sure to add a file AND a pid/fc :D";
+            return;
+        }
+
+        const pid = idInput.includes("-") ? fcToPid(idInput) : parseInt(idInput);
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const view = new DataView(data.buffer);
+
+                view.setUint32(0x5C, pid, false);
+
+                [0x4C, 0x58].forEach(off => {
+                    if (data[off] >= 255) throw new Error(`overflow at 0x${off.toString(16).toUpperCase()}`);
+                    data[off] += 1;
+                });
+
+                const crcSlice = data.slice(0x40, 0x7C);
+                const leBuffer = new Uint8Array(crcSlice.length);
+                for (let i = 0; i < crcSlice.length; i += 4) {
+                    leBuffer[i] = crcSlice[i+3];
+                    leBuffer[i+1] = crcSlice[i+2];
+                    leBuffer[i+2] = crcSlice[i+1];
+                    leBuffer[i+3] = crcSlice[i];
+                }
+
+                const crcVal = crc32(leBuffer);
+                view.setUint32(0x7C, crcVal, false);
+
+                const blob = new Blob([data], { type: "application/octet-stream" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `modified_${file.name}`;
+                a.click();
+
+                status.className = "text-center text-green-600 font-bold mt-2";
+                status.innerText = "File successfully patched.";
+            } catch (err) {
+                status.className = "text-center text-red-600 font-bold mt-2";
+                status.innerText = `❌ ${err.message}`;
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    async function handleRandomFC() {
+        const btn = document.getElementById('randomBtn');
+        const resEl = document.getElementById('randomResult');
+        
+        btn.disabled = true;
+        btn.innerText = "verifying...";
+        resEl.classList.remove('hidden');
+        resEl.innerHTML = `<span class="animate-pulse">spinning...</span>`;
+
+        let found = false;
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        while (!found && attempts < maxAttempts) {
+            attempts++;
+            const randomPid = Math.floor(Math.random() * 1000000000) + 1;
+            
+            try {
+                const response = await fetch("https://api.hyperlexus.uk/api/pinfo", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pid: randomPid })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.User) {
+                    const rawFc = pidToFc(randomPid);
+                    const formatted = formatFc(rawFc);
+                    const stickMoves = calculateStickMovements(formatted);
+
+                    resEl.innerHTML = `
+                        <div class="text-3xl font-bold font-mono text-green-600">${formatted}</div>
+                        <div class="text-sm font-medium text-indigo-800">PID: ${randomPid}</div>
+                        <div class="text-sm text-indigo-600 font-medium">
+                            Stick moves to add: ${stickMoves}
+                        </div>
+                    `;
+                    found = true;
+                }
+            } catch (e) {
+                resEl.innerHTML = `<span class="text-red-500 font-bold">API error (bruh): ${e.message}</span>`;
+                break;
+            }
+        }
+
+        if (!found && attempts >= maxAttempts) {
+            resEl.innerHTML = `<span class="text-red-500 font-bold">Woah! you rolled a taken fc ${maxAttempts} times in a row. What the fuck xD.</span>`;
+        }
+
+        btn.disabled = false;
+        btn.innerText = "spin again!";
+    }
+</script>
+</body>
+</html>
