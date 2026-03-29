@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://preview.redd.it/i-made-alternate-icons-of-the-pikmin-bloom-app-so-we-can-v0-103h79qut0991.png?width=512&format=png&auto=webp&s=d8064f7cad9645ea5951206c29455c934abd8599" type="image/jpeg">
+    <meta property="og:title" content="pikmin clock" />
+    <meta property="og:description" content="with a sun meter like in pikmin :D" />
+    <meta property="og:url" content="https://hyperlexus.uk/pikmin/clock" />
+    <meta name="theme-color" content="#7B68EE"> 
+    <title>pikmin clock :D</title>
+    <style>
+        @font-face {
+            font-family: 'PikminFont';
+            src: url('pikmin.ttf') format('truetype');
+        }
+
+        :root {
+            --sky-day: #87CEEB;
+            --sky-night: #1a1a2e;
+            --ground-day: #8FBC8F;
+            --ground-night: #2f4f4f;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'PikminFont', sans-serif;
+            overflow: hidden; 
+            background-color: #000; 
+        }
+
+        .container {
+            position: relative;
+            width: 100vw; 
+            height: 100vh;
+            background: linear-gradient(to bottom, var(--sky-day) 60%, var(--ground-day) 100%);
+            transition: background 2s ease;
+        }
+
+        .night-mode {
+            background: linear-gradient(to bottom, var(--sky-night) 60%, var(--ground-night) 100%);
+        }
+
+        .day-container {
+            position: absolute;
+            top: 40px;
+            right: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .day-label {
+            font-size: 2.5em; 
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            margin-bottom: 5px;
+            letter-spacing: 2px;
+        }
+
+        .day-bubble {
+            width: 120px; 
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), rgba(50,50,50,0.3));
+            box-shadow: 
+                inset 0 0 15px rgba(255,255,255,0.6), 
+                inset -5px -5px 15px rgba(0,0,0,0.3), 
+                0 5px 10px rgba(0,0,0,0.4); 
+            backdrop-filter: blur(3px); 
+            border: 1px solid rgba(255,255,255,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4em;
+            color: white;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.8); 
+        }
+
+        .meter-container {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60vw; 
+            height: 80px; 
+            z-index: 5;
+        }
+
+        .meter-track {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: transparent; 
+        }
+
+        .meter-dot {
+            border: none !important;
+            outline: none !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            -webkit-appearance: none;
+            object-fit: contain;
+            z-index: 1;
+            mix-blend-mode: screen; 
+        }
+
+        .big-dot { width: 24px; height: 24px; } 
+        .small-dot { width: 12px; height: 12px; }
+
+        .celestial-wrapper {
+            position: absolute;
+            top: 50%;
+            left: 0%; 
+            transform: translate(-50%, -50%);
+            width: 80px; 
+            height: 80px;
+            transition: left 1s linear, filter 2s ease;
+            z-index: 2; 
+            cursor: pointer;
+        }
+
+        .celestial-body {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            mix-blend-mode: screen;
+            animation: slowSpin 30s linear infinite; 
+        }
+
+        @keyframes slowSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .night-mode-moon {
+            filter: hue-rotate(180deg) brightness(0.8) contrast(1.2);
+        }
+
+        .time-tooltip {
+            position: absolute;
+            top: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 1.2rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.3);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .celestial-wrapper:hover .time-tooltip {
+            opacity: 1;
+        }
+
+        .center-image-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+        }
+
+        .center-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.85;
+            transition: opacity 1s ease, filter 1s ease; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="clock-container">
+    
+    <div class="meter-container">
+        <div class="meter-track">
+            <img src="resources/hud_elements/big-dot.png" class="meter-dot big-dot" alt="8:00">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            
+            <img src="resources/hud_elements/big-dot.png" class="meter-dot big-dot" alt="14:00">
+            
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/small-dot.png" class="meter-dot small-dot">
+            <img src="resources/hud_elements/big-dot.png" class="meter-dot big-dot" alt="20:00">
+        </div>
+        
+        <div class="celestial-wrapper" id="celestial-wrapper">
+            <div class="time-tooltip" id="time-tooltip">time loading...</div>
+            <img src="resources/hud_elements/sun-meter.png" class="celestial-body" id="celestial-body" alt="Sun">
+        </div>
+    </div>
+
+    <div class="day-container">
+        <div class="day-label">Day</div>
+        <div class="day-bubble" id="day-number">--</div>
+    </div>
+
+    <div class="center-image-container">
+        <img id="pikmin-image" class="center-image" src="" alt="background image didnt load LOL">
+    </div>
+
+    <audio id="bg-music" loop>
+        <source id="audio-source" src="" type="audio/mpeg">
+    </audio>
+
+</div>
+
+<script>
+    const randomTrackNumber = Math.floor(Math.random() * 15) + 1;
+    const paddedTrackNumber = randomTrackNumber.toString().padStart(2, '0');
+    const audioSrc = `resources/audio/${paddedTrackNumber}.mp3`;
+    
+    document.getElementById('audio-source').src = audioSrc;
+    document.getElementById('bg-music').load();
+
+    document.body.addEventListener('click', () => {
+        document.getElementById('bg-music').play().catch((err) => console.log("audio couldnt play: ", err));
+    }, { once: true });
+
+
+    function getAbsoluteDayOfYear(date) {
+        const start = new Date(date.getFullYear(), 0, 0);
+        return Math.floor(((date - start) + ((start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000)) / (1000 * 60 * 60 * 24));
+    }
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    function updateClock() {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const seconds = now.getSeconds();
+        const currentMonthName = monthNames[now.getMonth()];
+
+        const dayNumber = getAbsoluteDayOfYear(now);
+        document.getElementById('day-number').innerText = dayNumber;
+        if (dayNumber >= 100) {
+            document.getElementById('day-number').style.fontSize = "3em";
+        } else if (dayNumber < 10) {
+            document.getElementById('day-number').style.fontSize = "5em";
+        }
+
+        const container = document.getElementById('clock-container');
+        const celestialWrapper = document.getElementById('celestial-wrapper');
+        const tooltip = document.getElementById('time-tooltip');
+        const img = document.getElementById('pikmin-image');
+
+        const expectedImagePath = `resources/background_images/${currentMonthName}.jpg`;
+        if (img.getAttribute('src') !== expectedImagePath) {
+            img.src = expectedImagePath;
+        }
+
+        tooltip.innerText = now.toLocaleTimeString('en-GB');
+
+        const isDaytime = hours >= 8 && hours < 20;
+        let totalSecondsPassed;
+        const twelveHoursInSeconds = 12 * 60 * 60;
+        let imageBrightness = 1.0;
+
+        if (isDaytime) {
+            container.classList.remove('night-mode');
+            celestialWrapper.classList.remove('night-mode-moon'); 
+            totalSecondsPassed = ((hours - 8) * 3600) + (minutes * 60) + seconds;
+        } else {
+            container.classList.add('night-mode');
+            celestialWrapper.classList.add('night-mode-moon'); 
+            
+            let nightHours = hours >= 20 ? hours - 20 : hours + 4;
+            totalSecondsPassed = (nightHours * 3600) + (minutes * 60) + seconds;
+            
+            imageBrightness = 0.3 + (0.7 * (Math.abs(nightHours + (minutes / 60) + (seconds / 3600) - 6)/ 6));
+        }
+
+        img.style.filter = `brightness(${imageBrightness})`;
+
+        const percentageComplete = totalSecondsPassed / twelveHoursInSeconds;
+        const clampedPercentage = Math.max(0, Math.min(1, percentageComplete));
+        celestialWrapper.style.left = `${clampedPercentage * 100}%`;
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+</script>
+
+</body>
+</html>
