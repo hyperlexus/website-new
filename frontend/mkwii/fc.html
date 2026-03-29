@@ -39,7 +39,7 @@
         <div id="pinfoResult" class="mt-4 p-4 rounded-xl bg-white/50 border border-indigo-50 hidden text-indigo-900"></div>
     </div>
 
-    <div class="glass p-8 rounded-3xl shadow-xl border border-white">
+    <!-- <div class="glass p-8 rounded-3xl shadow-xl border border-white">
         <h2 class="text-xl font-semibold text-indigo-800 mb-4 flex items-center">
             <span class="mr-2"></span> Overwrite FC stored in .rkp (change the FC for a licence)
         </h2>
@@ -55,9 +55,13 @@
                 </label>
             </div>
 
-            <button onclick="" class="w-full btn-primary text-white py-4 rounded-xl font-bold shadow-lg tracking-wider disabled">Patch (out of order)</button>
+            <button onclick="handleRkpProcess()" class="w-full btn-primary text-white py-4 rounded-xl font-bold shadow-lg tracking-wider disabled">Patch (DOESNT CHECK IF FC IS VALID!!!!)</button>
             <p id="rkpStatus" class="text-sm text-center font-medium"></p>
         </div>
+    </div> -->
+
+    <div class="text-center">
+        <p style="font-size: small;">rkp patcher now over at <a href=""></a></p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -87,7 +91,7 @@
     </div>
     <div class="text-center">
         <p>credits to lex for the fc gambling idea :bsmiley:</p>
-        <p>thanks to ki for help with css and lots of laughing while making this &lt;3</p>
+        <p>thanks to chiara for help with css and lots of laughing while making this &lt;3</p>
     </div>
 
 </div>
@@ -286,6 +290,8 @@
                 box.innerHTML = `<strong>Taken by:</strong> ${data.User.LastInGameSn}<br>
                                  <strong>Banned:</strong> ${banStatusText}
                                  ${extraInfoHtml}`;
+            } else if (pid > 999999999) {
+                box.innerHTML = `<strong>Invalid!</strong> PID is greater than or equal to 1 billion`
             } else {
                 box.innerHTML = `<span class="text-green-600 font-bold">✅ This FC is free!</span>
                                  ${extraInfoHtml}`;

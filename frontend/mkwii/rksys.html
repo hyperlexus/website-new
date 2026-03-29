@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RR rksys.dat modifier</title>
+    <meta property="og:title" content="licence tools" />
+    <meta property="og:description" content="manage your licences and VR values! made by HyperLexus" />
+    <meta property="og:url" content="https://hyperlexus.uk/mkwii/fc" />
+    <meta name="theme-color" content="#7B68EE"> 
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f0ff; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .btn-primary { background-color: #7B68EE; transition: all 0.2s; }
+        .btn-primary:hover:not(:disabled) { background-color: #6A5ACD; transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #7B68EE; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .drag-active { background-color: rgba(99, 102, 241, 0.1); border-color: #6366f1; }
+    </style>
+</head>
+<body class="min-h-screen py-10 px-4">
+
+<div class="max-w-5xl mx-auto space-y-8">
+    <div class="text-center space-y-2">
+        <h1 class="text-4xl font-bold text-indigo-900 tracking-tight">VR & licence editor</h1>
+        <!-- <p class="text-indigo-600 font-medium">subtext</p> -->
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="glass p-6 rounded-3xl shadow-xl border border-white text-center h-full flex flex-col justify-center">
+            <h2 class="text-lg font-bold text-indigo-800 mb-3 flex items-center justify-center gap-2">
+                rksys.dat (save file)
+                <div class="relative group cursor-help">
+                    <svg class="w-5 h-5 text-indigo-400 hover:text-indigo-600 transition" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 hidden group-hover:block w-72 p-4 bg-indigo-950 text-indigo-50 text-xs rounded-xl shadow-2xl z-50 text-left pointer-events-none border border-indigo-700">
+                        <p class="font-bold text-indigo-200 mb-1 border-b border-indigo-800 pb-1">path to file:</p>
+                        <p class="font-mono text-[10px] break-all bg-indigo-900/50 p-2 rounded mb-2 text-indigo-100">Dolphin Emulator/Load/Riivolution/WheelWizard/riivolution/save/RetroWFC/RMCx/rksys.dat</p>
+                        <p class="text-indigo-300">more info: <code class="bg-indigo-800 px-1.5 py-0.5 rounded text-white font-mono">!rksys</code> in the RR discord</p>
+                        <svg class="absolute text-indigo-950 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255"><polygon class="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
+                    </div>
+                </div>
+            </h2>
+            <label id="rksysDrop" class="flex flex-col items-center justify-center w-full h-32 border-2 border-indigo-200 border-dashed rounded-xl cursor-pointer bg-white/30 hover:bg-indigo-50/50 transition">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none">
+                    <svg class="w-8 h-8 text-indigo-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p id="rksysName" class="text-sm text-indigo-600 font-medium">drag & drop or pick  rksys.dat</p>
+                </div>
+                <input id="rksysInput" type="file" class="hidden" accept=".dat" onchange="handleRksysUpload(event)"/>
+            </label>
+        </div>
+
+        <div id="rrUploadBox" class="glass p-6 rounded-3xl shadow-xl border border-white text-center h-full flex flex-col justify-center hidden opacity-50 transition-opacity duration-500">
+            <h2 class="text-lg font-bold text-indigo-800 mb-3 flex items-center justify-center gap-2">
+                RRRating.pul (VR values)  <!-- copy paste lul -->
+                <div class="relative group cursor-help">
+                    <svg class="w-5 h-5 text-indigo-400 hover:text-indigo-600 transition" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 hidden group-hover:block w-72 p-4 bg-indigo-950 text-indigo-50 text-xs rounded-xl shadow-2xl z-50 text-left pointer-events-none border border-indigo-700">
+                        <p class="font-bold text-indigo-200 mb-1 border-b border-indigo-800 pb-1">if you have an existing licence and want your vr to be carried over.<br>path to file:</p>
+                        <p class="font-mono text-[10px] break-all bg-indigo-900/50 p-2 rounded mb-2 text-indigo-100">%appdata%\Dolphin Emulator\Wii\shared2\Pulsar\RetroRewind6\RRRating.pul</p>
+                        <p class="text-indigo-300">more info: <code class="bg-indigo-800 px-1.5 py-0.5 rounded text-white font-mono">!ratingpath</code> in the RR discord</p>
+                        <svg class="absolute text-indigo-950 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255"><polygon class="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
+                    </div>
+                </div>
+            </h2>
+            <label id="rrDrop" class="flex flex-col items-center justify-center w-full h-32 border-2 border-indigo-200 border-dashed rounded-xl cursor-pointer bg-white/30 hover:bg-indigo-50/50 transition">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none">
+                    <svg class="w-8 h-8 text-indigo-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <p id="rrName" class="text-sm text-indigo-600 font-medium">drag & drop or pick RRRating.pul file</p>
+                </div>
+                <input id="rrInput" type="file" class="hidden" accept=".pul" onchange="handleRrUpload(event)"/>
+            </label>
+        </div>
+    </div>
+
+    <div id="licenseGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+        </div>
+
+    <div id="saveControls" class="glass p-6 rounded-3xl shadow-xl border border-white text-center hidden flex-col items-center space-y-4">
+        <button id="saveBtn" onclick="saveFiles()" class="btn-primary text-white px-10 py-4 rounded-xl font-bold shadow-lg tracking-wide text-lg w-full md:w-auto">
+            patch + download file(s)
+        </button>
+        <div id="statusMsg" class="font-medium text-sm min-h-[1.5rem]"></div>
+    </div>
+    <div class="text-center">
+        <p>credits to chiara for css &lt;3</p>
+        <p>credits to gab for his <a href=https://gabrlel.github.io>github pages</a>, helped a lot with reverse engineering rksys</p>
+    </div>
+
+</div>
+
+<script>
+    const LICENSE_OFFSETS = [0x08, 0x8CC8, 0x11988, 0x1A648];
+    let rksysBuffer = null;
+    let rrBuffer = null;
+    let licenseData = []; 
+
+    function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+    function pidToFc(pid) {  // why does javascript make everything look so much worse
+        if (!pid || pid === 0) return "0";
+        const buffer = new ArrayBuffer(8);
+        const view = new DataView(buffer);
+        view.setUint32(0, pid, true);
+        const jcmr = [74, 67, 77, 82];
+        const uint8 = new Uint8Array(buffer);
+        for(let i = 0; i < 4; i++) uint8[4 + i] = jcmr[i];
+        const spark = new SparkMD5.ArrayBuffer();
+        spark.append(buffer);
+        const hexHash = spark.end();
+        const firstByte = parseInt(hexHash.substring(0, 2), 16);
+        const high = BigInt(firstByte >> 1);
+        const fcBigInt = (high << 32n) | BigInt(pid);
+        return fcBigInt.toString();
+    }
+    function fcToPid(fc) { return Number(BigInt(fc.replace(/-/g, "")) & 0xFFFFFFFFn); }
+    function formatFc(fcStr) {
+        if (fcStr === "0") return "0000-0000-0000";
+        const padded = fcStr.padStart(12, '0');
+        return `${padded.slice(0, 4)}-${padded.slice(4, 8)}-${padded.slice(8)}`;
+    }
+    function crc32(buffer) {
+        let table = new Uint32Array(256);
+        for (let i = 0; i < 256; i++) {
+            let c = i;
+            for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            table[i] = c;
+        }
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < buffer.length; i++) crc = (crc >>> 8) ^ table[(crc ^ buffer[i]) & 0xFF];
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    function readMiiName(dv, licBase) {
+        const arr = new Uint8Array(dv.buffer, licBase + 0x14, 0x14);
+        let out = '';
+        for (let i = 0; i < arr.length; i += 2) {
+            const code = (arr[i] << 8) | arr[i+1];
+            if (!code) break;
+            out += String.fromCharCode(code);
+        }
+        return out || 'empty licence or no mii';
+    }
+
+    async function handleRksysUpload(e) {
+        const file = e.target.files ? e.target.files[0] : (e.dataTransfer && e.dataTransfer.files[0]);
+        if (!file) return;
+
+        document.getElementById('rksysName').innerText = file.name;
+        const buf = await file.arrayBuffer();
+        rksysBuffer = buf.slice(0);
+        const dv = new DataView(rksysBuffer);
+        
+        licenseData = [];
+        for (let i = 0; i < 4; i++) {
+            const base = LICENSE_OFFSETS[i];  // fucking hell
+            const miiName = readMiiName(dv, base);
+            const originalPid = dv.getUint32(base + 0x5C, false);
+            licenseData.push({ id: i, base, miiName, originalPid, currentPid: originalPid, isValid: true, pulEntryIndex: -1, currentVr: null });
+        }
+
+        renderGrid();
+        document.getElementById('licenseGrid').classList.remove('hidden');
+        document.getElementById('saveControls').classList.remove('hidden');
+        
+        const rrBox = document.getElementById('rrUploadBox');
+        rrBox.classList.remove('hidden');
+        setTimeout(() => rrBox.classList.remove('opacity-50'), 50);
+        setStatus("");
+    }
+
+    async function handleRrUpload(e) {
+        const file = e.target.files ? e.target.files[0] : (e.dataTransfer && e.dataTransfer.files[0]);
+        if (!file) return;
+
+        document.getElementById('rrName').innerText = file.name;
+        const buf = await file.arrayBuffer();
+        rrBuffer = buf.slice(0);
+        const view = new DataView(rrBuffer);
+
+        if (view.byteLength < 8) return setStatus("error: RRRating.pul is too small, it kinda reminds me of my penis", true);
+        const count = view.getUint16(6, false);
+        const maxEntries = Math.floor((view.byteLength - 8) / 16);
+        const entriesToRead = Math.min(count, maxEntries);
+
+        for (let i = 0; i < entriesToRead; i++) {
+            const base = 8 + i * 16;
+            const profileId = view.getInt32(base, false);
+            const flags = view.getUint32(base + 12, false);
+            
+            if ((flags & 0x1) !== 0 && profileId > 0) {
+                const licMatch = licenseData.find(l => l.originalPid === profileId);
+                if (licMatch) {
+                    licMatch.pulEntryIndex = i;
+                    let vrRaw = view.getFloat32(base + 4, false);
+                    licMatch.currentVr = Math.round(clamp(vrRaw, -10000, 10000) * 100); 
+                }
+            }
+        }
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('licenseGrid');
+        grid.innerHTML = '';
+
+        licenseData.forEach((lic, i) => {
+            const fcFormatted = lic.originalPid === 0 ? "0000-0000-0000" : formatFc(pidToFc(lic.currentPid));
+            const disabledState = lic.originalPid === 0 ? 'disabled' : '';
+            
+            const vrBlock = lic.pulEntryIndex !== -1 ? `
+                <div class="mt-4 pt-4 border-t border-indigo-100/50">
+                    <label class="text-xs font-semibold text-indigo-500 uppercase tracking-wider block mb-1">VR</label>
+                    <input type="number" id="vr-${i}" value="${lic.currentVr}" oninput="syncVr(${i})" class="w-full p-2.5 rounded-xl border-2 border-indigo-100 focus:border-indigo-400 outline-none text-indigo-900 font-bold text-center bg-indigo-50/50" ${disabledState}>
+                </div>
+            ` : '';
+
+            grid.innerHTML += `
+                <div class="glass p-6 rounded-3xl shadow-lg border border-white flex flex-col relative">
+                    <div class="absolute top-4 right-4 bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-1 rounded-md">licence ${i + 1}</div>
+                    <h2 class="text-xl font-bold text-indigo-900 truncate pr-12 mb-4">${lic.miiName}</h2>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-xs font-semibold text-indigo-500 uppercase tracking-wider block mb-1">Friend Code</label>
+                            <input type="text" id="fc-${i}" value="${fcFormatted}" oninput="syncInputs(${i}, 'fc')" class="w-full p-2.5 rounded-xl border-2 border-indigo-100 focus:border-indigo-400 outline-none text-indigo-900 font-medium font-mono text-center tracking-widest" ${disabledState}>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-indigo-500 uppercase tracking-wider block mb-1">Player ID</label>
+                            <input type="text" id="pid-${i}" value="${lic.currentPid}" oninput="syncInputs(${i}, 'pid')" class="w-full p-2.5 rounded-xl border-2 border-indigo-100 focus:border-indigo-400 outline-none text-indigo-900 font-medium text-center" ${disabledState}>
+                        </div>
+                        <div id="err-${i}" class="text-xs text-red-600 font-medium hidden p-2 bg-red-50 rounded-lg border border-red-100"></div>
+                    </div>
+                    ${vrBlock}
+                </div>
+            `;
+        });
+    }
+
+    // fix layer 8 problems (u gotta expect this shit from people that think they can just edit fcs without knowing anything LOL)
+    function applyFix(index, correctFcStr) {
+        document.getElementById(`fc-${index}`).value = formatFc(correctFcStr);
+        syncInputs(index, 'fc');
+    }
+
+    function syncInputs(index, source) {
+        const fcInput = document.getElementById(`fc-${index}`);
+        const pidInput = document.getElementById(`pid-${index}`);
+        const errDiv = document.getElementById(`err-${index}`);
+        
+        errDiv.classList.add('hidden');
+        errDiv.innerHTML = '';
+        licenseData[index].isValid = true;
+
+        if (source === 'fc') {
+            const val = fcInput.value.trim();
+            const cleanVal = val.replace(/-/g, '');
+            
+            if (cleanVal.length > 0) {
+                const newPid = fcToPid(val);
+                const trueFc = pidToFc(newPid).padStart(12, '0');
+                
+                if (newPid < 1 || newPid > 999999999) {
+                    errDiv.innerHTML = '😢 PID must be between 1 and 999,999,999!';
+                    errDiv.classList.remove('hidden');
+                    licenseData[index].isValid = false;
+                } else if (cleanVal !== trueFc) {
+                    errDiv.innerHTML = `👺 Invalid Checksum. Did you mean: <button onclick="applyFix(${index}, '${trueFc}')" class="font-bold text-indigo-700 underline hover:text-indigo-900 transition">${formatFc(trueFc)}</button>?`;
+                    errDiv.classList.remove('hidden');
+                    licenseData[index].isValid = false;
+                }
+                
+                pidInput.value = newPid; 
+                licenseData[index].currentPid = newPid;
+            }
+        } else {
+            const val = parseInt(pidInput.value.trim());
+            if (!isNaN(val)) {
+                if (val < 1 || val > 999999999) {
+                    errDiv.innerHTML = 'PID must be between 1 and 999,999,999!';
+                    errDiv.classList.remove('hidden');
+                    licenseData[index].isValid = false;
+                }
+                
+                fcInput.value = formatFc(pidToFc(val));
+                licenseData[index].currentPid = val;
+            }
+        }
+    }
+
+    function syncVr(index) {
+        const vrInput = document.getElementById(`vr-${index}`);
+        let parsed = parseInt(vrInput.value);
+        if (!isNaN(parsed)) {
+            licenseData[index].currentVr = clamp(parsed, 0, 1000001);
+        }
+    }
+
+    function setStatus(msg, isError = false, loading = false) {
+        const el = document.getElementById('statusMsg');
+        el.className = `font-medium text-sm mt-2 ${isError ? 'text-red-600' : 'text-indigo-600'}`;
+        el.innerHTML = loading ? `<span class="loader mr-2"></span>${msg}` : msg;
+    }
+
+    function setupDropzone(id, handler) {
+        const el = document.getElementById(id);
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+            el.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); });
+        });
+        el.addEventListener('dragover', () => el.classList.add('drag-active'));
+        el.addEventListener('dragleave', () => el.classList.remove('drag-active'));
+        el.addEventListener('drop', e => {
+            el.classList.remove('drag-active');
+            if (e.dataTransfer.files.length) handler(e);
+        });
+    }
+    setupDropzone('rksysDrop', handleRksysUpload);
+    setupDropzone('rrDrop', handleRrUpload);
+
+    async function verifyPid(pid) {
+        try {
+            const res = await fetch("https://api.hyperlexus.uk/api/pinfo", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pid })
+            });
+            const data = await res.json();
+            return data.User ? data.User.LastInGameSn : null;
+        } catch (e) { throw new Error("coudlnt contact api, network error"); }
+    }
+
+    function bumpByte(dv, offset) {
+        let val = dv.getUint8(offset);
+        if (val >= 255) throw new Error(`byte overflow at 0x${offset.toString(16).toUpperCase()}. you either changed your fc too many times or you got unlucky, delete your licence and make a new one, remember your vr tho lol`);
+        // ngl dunno why im even raising this anymore, it could easily be incremented by 1 at the offset of 0x4C - 1 but i dont wanna change that as it works rn xd
+        dv.setUint8(offset, val + 1);
+    }
+
+    function recalculateLicenseCrc(dv, baseOffset) {
+        const dwcOffset = baseOffset + 0x40;
+        const crcSlice = new Uint8Array(dv.buffer, dwcOffset, 0x3C); 
+        const leBuffer = new Uint8Array(crcSlice.length);
+        for (let i = 0; i < crcSlice.length; i += 4) {
+            leBuffer[i]   = crcSlice[i+3];
+            leBuffer[i+1] = crcSlice[i+2];
+            leBuffer[i+2] = crcSlice[i+1];
+            leBuffer[i+3] = crcSlice[i];
+        }
+        dv.setUint32(dwcOffset + 0x3C, crc32(leBuffer), false); 
+    }
+
+    function recalculateGlobalCrc(dv) {
+        const crcSlice = new Uint8Array(dv.buffer, 0, 0x27FFC);
+        dv.setUint32(0x27FFC, crc32(crcSlice), false); 
+    }
+
+    async function saveFiles() {
+        const invalidLic = licenseData.find(l => !l.isValid && l.originalPid !== 0);
+        if (invalidLic) {
+            return setStatus(`can't save! there's still errors on licence ${invalidLic.id + 1}, fix those before exporting`, true);
+        }
+
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        setStatus("verifying...", false, true);
+
+        const rksysDv = new DataView(rksysBuffer);
+        const rrDv = rrBuffer ? new DataView(rrBuffer) : null;
+        let rksysChanged = false;
+        let rrChanged = false;
+
+        try {
+            for (const lic of licenseData) {
+                if (lic.currentPid !== lic.originalPid && lic.originalPid !== 0) {
+                    const takenBy = await verifyPid(lic.currentPid);
+                    if (takenBy) throw new Error(`error on licence ${lic.id + 1}: fc is already taken by ${takenBy}, you can't have it.`);
+
+                    rksysDv.setUint32(lic.base + 0x5C, lic.currentPid, false); 
+                    bumpByte(rksysDv, lic.base + 0x4C);
+                    bumpByte(rksysDv, lic.base + 0x58);
+                    recalculateLicenseCrc(rksysDv, lic.base);
+                    rksysChanged = true;
+                }
+
+                if (rrDv && lic.pulEntryIndex !== -1) {
+                    const base = 8 + lic.pulEntryIndex * 16;
+                    
+                    if (lic.currentPid !== lic.originalPid) {
+                        rrDv.setInt32(base, lic.currentPid, false);
+                        rrChanged = true;
+                    }
+
+                    const vrToWrite = clamp(lic.currentVr / 100, 1, 10000);
+                    const currentVrStored = rrDv.getFloat32(base + 4, false);
+                    
+                    if (vrToWrite !== currentVrStored) {
+                        rrDv.setFloat32(base + 4, vrToWrite, false);
+                        let flags = rrDv.getUint32(base + 12, false);
+                        rrDv.setUint32(base + 12, (flags | 0x1) >>> 0, false);
+                        rrChanged = true;
+                    }
+                }
+            }
+
+            if (!rksysChanged && !rrChanged) {
+                setStatus("no changes were made, download would be pointless", false);
+                btn.disabled = false;
+                return;
+            }
+
+            if (rksysChanged) {
+                recalculateGlobalCrc(rksysDv);
+                const blob = new Blob([rksysBuffer], { type: "application/octet-stream" });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `rksys.dat`;
+                a.click();
+            }
+
+            if (rrChanged) {
+                setTimeout(() => {
+                    const blob = new Blob([rrBuffer], { type: "application/octet-stream" });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `RRRating.pul`;
+                    a.click();
+                }, 500);
+            }
+            
+            setStatus(`${rksysChanged && rrChanged ? 'files' : 'file'} modified! downloading`, false);
+            licenseData.forEach(l => l.originalPid = l.currentPid);  // update memory so it stops being wrong after download
+
+        } catch (err) {
+            setStatus(err.message, true);  // too lazy for fuckass error handling
+        } finally {
+            btn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
